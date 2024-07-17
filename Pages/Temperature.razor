@@ -1,0 +1,100 @@
+@page "/temperature"
+@using System.Text.Json
+@inject WebSocketService WebSocketService
+
+<h3>Temperature Data</h3>
+
+<p>@message</p>
+
+<TemperatureChart @ref="temperatureChart" />
+
+@code {
+    private string message;
+    private TemperatureChart temperatureChart;
+
+    protected override async Task OnInitializedAsync()
+    {
+        WebSocketService.OnMessageReceived += HandleMessage;
+
+        // Start the WebSocket connection
+        await WebSocketService.StartAsync(CancellationToken.None);
+    }
+
+
+    private void HandleMessage(string json)
+    {
+        Console.WriteLine($"Raw JSON received: {json}");
+        try
+        {
+            var data = JsonSerializer.Deserialize<TemperatureData>(json);
+            
+            if (data != null)
+            {
+                Console.WriteLine($"Deserialized data - Timestamp: {data.timestamp}, Temperature: {data.temperature}");
+                message = $"Timestamp: {data.timestamp}, Temperature: {data.temperature}";
+                InvokeAsync(StateHasChanged);
+                temperatureChart.UpdateChartAsync(data.timestamp, double.Parse(data.temperature));
+            }
+            else
+            {
+                Console.WriteLine("Deserialization resulted in null data.");
+            }
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Deserialization error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling message: {ex.Message}");
+        }
+    }
+
+
+    @* private async void HandleMessage(string json)
+    {
+        Console.WriteLine($"Raw JSON received: {json}");
+        try
+        {
+            var data = JsonSerializer.Deserialize<TemperatureData>(json);
+            
+            if (data != null)
+            {
+                Console.WriteLine($"Deserialized data - Timestamp: {data.timestamp}, Temperature: {data.temperature}");
+                message = $"Timestamp: {data.timestamp}, Temperature: {data.temperature}";
+
+                try
+                {
+                    await temperatureChart.UpdateChartAsync(data.timestamp, double.Parse(data.temperature));
+                }
+                catch (JSDisconnectedException)
+                {
+                    Console.WriteLine("JavaScript runtime disconnected. Unable to update chart.");
+                }
+                InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                Console.WriteLine("Deserialization resulted in null data.");
+            }
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Deserialization error: {ex.Message}");
+        }
+    } *@
+
+
+    public async ValueTask DisposeAsync()
+    {
+        WebSocketService.OnMessageReceived -= HandleMessage;
+    }
+
+    private class TemperatureData
+    {
+        public string timestamp { get; set; } // Ensure these match the JSON keys
+        public string temperature { get; set; }
+    }
+
+    
+}
